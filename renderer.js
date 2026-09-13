@@ -10,6 +10,7 @@ const discordStatusDot = document.getElementById('discord-status-dot');
 const discordStatusText = document.getElementById('discord-status-text');
 
 const nowPlayingCard = document.getElementById('now-playing-card');
+const nowPlayingCover = document.getElementById('now-playing-cover');
 const nowPlayingTitle = document.getElementById('now-playing-title');
 const nowPlayingState = document.getElementById('now-playing-state');
 
@@ -39,6 +40,18 @@ function showToast(message) {
     }, 3000);
 }
 
+function formatDuration(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+        return null;
+    }
+
+    const totalMinutes = Math.round(seconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
 // Update Status indicators
 function updateUIStatus(status) {
     // Addon server status
@@ -63,14 +76,21 @@ function updateUIStatus(status) {
     if (status.nowPlaying && status.nowPlaying.title) {
         nowPlayingCard.style.display = 'flex';
         nowPlayingTitle.textContent = `Watching: ${status.nowPlaying.title}`;
+        nowPlayingCover.src = status.nowPlaying.poster || 'Assets/DiscordRPCStremio.png';
+
+        const state = [];
         if (status.nowPlaying.season && status.nowPlaying.episode) {
-            nowPlayingState.style.display = 'block';
-            nowPlayingState.textContent = `Season ${status.nowPlaying.season} • Episode ${status.nowPlaying.episode}`;
+            state.push(`Season ${status.nowPlaying.season} • Episode ${status.nowPlaying.episode}`);
         } else {
-            nowPlayingState.style.display = 'none';
+            state.push('Movie');
         }
+        const duration = formatDuration(status.nowPlaying.runtimeSeconds);
+        if (duration) state.push(`${duration} total`);
+        nowPlayingState.style.display = 'block';
+        nowPlayingState.textContent = state.join(' • ');
     } else {
         nowPlayingCard.style.display = 'none';
+        nowPlayingCover.src = 'Assets/DiscordRPCStremio.png';
     }
 }
 
@@ -93,9 +113,17 @@ btnSave.addEventListener('click', async () => {
     }
 });
 
-btnInstall.addEventListener('click', () => {
-    window.api.installAddon();
-    showToast('Sent install request to Stremio!');
+btnInstall.addEventListener('click', async () => {
+    try {
+        const result = await window.api.installAddon();
+        if (result.success) {
+            showToast('Add-on URL copied. Paste it into Stremio’s Add-on Repository URL field.');
+        } else {
+            showToast(result.error || 'Unable to prepare the add-on URL.');
+        }
+    } catch (err) {
+        showToast('Unable to prepare the add-on URL.');
+    }
 });
 
 // Watch for status changes from main process

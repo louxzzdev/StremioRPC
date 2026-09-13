@@ -22,7 +22,8 @@ There are no API keys or Discord IDs for users to configure. The application use
 ## Features
 
 - Displays Stremio movies and series in Discord Rich Presence.
-- Resolves titles through Cinemeta, with the project OMDb key as a fallback.
+- Resolves titles, posters, and runtimes through Cinemeta, with the project OMDb key as a fallback.
+- Shows the movie or episode poster and total runtime in Discord Rich Presence.
 - Installs the local Stremio add-on from the app.
 - Runs quietly in the system tray or macOS menu bar.
 - Starts at login when enabled.
@@ -40,12 +41,13 @@ On Linux, use a Discord package that supports local IPC. The Flatpak build may n
 
 1. Download and install the release for your operating system.
 2. Open StremioRPC. It connects to Discord automatically.
-3. Click **Install Addon on Stremio** once and confirm the prompt in Stremio.
-4. Start watching in Stremio.
+3. Click **Copy Add-on URL & Open Stremio**. The local URL is copied to your clipboard.
+4. In Stremio, open **Add-ons**, paste the URL into **Add-on Repository URL**, and install it once.
+5. Start watching in Stremio.
 
 That is all the setup required. You can enable **Run on Boot** and **Close to Tray** in the app so the companion stays available without being opened manually.
 
-The add-on is local-only and is served at `http://localhost:7000`; no playback information is sent to a StremioRPC server.
+The add-on is local-only and is served at `http://127.0.0.1:45123`; no playback information is sent to a StremioRPC server.
 
 ## Platform packages
 
@@ -169,7 +171,7 @@ Open the Discord Desktop app, then restart StremioRPC. Confirm that activity sha
 
 **Playback does not appear**
 
-Use **Install Addon on Stremio** from StremioRPC and confirm the installation in Stremio. Check that the dashboard reports the add-on as running on port 7000.
+Use **Copy Add-on URL & Open Stremio** from StremioRPC, then paste the copied URL into Stremio's **Add-on Repository URL** field. Check that the dashboard reports the add-on as running on port 45123.
 
 **An IMDb ID appears instead of a title**
 

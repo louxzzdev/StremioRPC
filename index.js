@@ -1,14 +1,14 @@
-const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, clipboard, ipcMain, nativeImage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const http = require('http');
 const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
 const RPC = require('discord-rpc');
-const { resolveMediaTitle } = require('./metadata');
+const { resolveMediaInfo } = require('./metadata');
 
 // Public application ID registered for StremioRPC Rich Presence.
 const DISCORD_CLIENT_ID = '1548667063453622395';
+const ADDON_PORT = 45123;
 
 // App state
 let mainWindow = null;
@@ -18,14 +18,15 @@ let isRpcConnected = false;
 let rpcStatusMessage = 'Disconnected';
 let currentNowPlaying = null;
 let addonServer = null;
+let addonServerStarting = false;
+let addonServerError = null;
 let rpcRetryTimer = null;
 
 // Playback monitoring state
 let playbackMonitorInterval = null;
 let lastActivityTimestamp = null;
-let stremioNotFoundCount = 0;
 const ACTIVITY_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hour safety net
-const MONITOR_POLL_MS = 15 * 1000; // check every 15 seconds
+const MONITOR_POLL_MS = 60 * 1000; // check every minute
 
 // Determine hidden startup
 let startHidden = process.argv.includes('--hidden') || process.argv.includes('-h');
@@ -149,16 +150,28 @@ function createApplicationMenu() {
 }
 
 // Media title helper
-async function getTitleFromIMDB(id, type = 'movie') {
-    return resolveMediaTitle(id, type);
+async function getMediaInfo(id, type = 'movie') {
+    return resolveMediaInfo(id, type);
+}
+
+function formatDuration(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+        return null;
+    }
+
+    const totalMinutes = Math.round(seconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
 // Send updates to the UI
 function broadcastStatus() {
     if (mainWindow && !mainWindow.webContents.isDestroyed()) {
         const status = {
-            addonRunning: !!addonServer,
-            addonPort: 7000,
+            addonRunning: isAddonRunning(),
+            addonPort: ADDON_PORT,
             discordConnected: isRpcConnected,
             discordStatusMessage: rpcStatusMessage,
             nowPlaying: currentNowPlaying
@@ -167,21 +180,8 @@ function broadcastStatus() {
     }
 }
 
-// Playback monitoring (detect when Stremio closes)
-function isStremioRunning() {
-    return new Promise((resolve) => {
-        const req = http.get('http://localhost:11470', (res) => {
-            resolve(true);
-            res.resume();
-        });
-        req.on('error', () => {
-            resolve(false);
-        });
-        req.setTimeout(2000, () => {
-            req.destroy();
-            resolve(false);
-        });
-    });
+function isAddonRunning() {
+    return Boolean(addonServer?.listening);
 }
 
 async function clearActivity() {
@@ -203,18 +203,6 @@ function startPlaybackMonitor() {
 
     playbackMonitorInterval = setInterval(async () => {
         if (!currentNowPlaying) return;
-
-        const stremioRunning = await isStremioRunning();
-        if (!stremioRunning) {
-            stremioNotFoundCount++;
-            if (stremioNotFoundCount >= 4) {
-                console.log('Stremio is no longer running, clearing Discord activity');
-                stremioNotFoundCount = 0;
-                await clearActivity();
-            }
-            return;
-        }
-        stremioNotFoundCount = 0;
 
         if (lastActivityTimestamp && (Date.now() - lastActivityTimestamp > ACTIVITY_TIMEOUT_MS)) {
             console.log('Activity timed out, clearing Discord activity');
@@ -310,23 +298,36 @@ async function updateRPC(data) {
     const season = parts[1];
     const episode = parts[2];
 
-    const title = await getTitleFromIMDB(imdb, data.type || 'movie');
+    const media = await getMediaInfo(imdb, data.type || 'movie');
+    const title = media.title;
+    const duration = formatDuration(media.runtimeSeconds);
 
     const activity = {
         details: `Watching: ${title}`,
-        largeImageKey: "stremio",
-        largeImageText: "Stremio",
+        largeImageKey: media.poster || 'stremio',
+        largeImageText: title,
         startTimestamp: Math.floor(data.timestamp / 1000)
     };
 
+    if (media.poster) {
+        activity.smallImageKey = 'stremio';
+        activity.smallImageText = 'StremioRPC';
+    }
+
+    if (media.runtimeSeconds) {
+        activity.endTimestamp = Math.floor((data.timestamp + media.runtimeSeconds * 1000) / 1000);
+    }
+
     if (season && episode) {
-        activity.state = `Season ${season} • Episode ${episode}`;
+        activity.state = `Season ${season} • Episode ${episode}${duration ? ` • ${duration} total` : ''}`;
     } else {
-        activity.state = `Movie`;
+        activity.state = `Movie${duration ? ` • ${duration} total` : ''}`;
     }
 
     currentNowPlaying = {
         title,
+        poster: media.poster,
+        runtimeSeconds: media.runtimeSeconds,
         season,
         episode,
         type: data.type
@@ -347,13 +348,38 @@ async function updateRPC(data) {
     broadcastStatus();
 }
 
-function installAddonInStremio() {
-    shell.openExternal('stremio://localhost:7000/manifest.json');
+function getAddonManifestUrl() {
+    return `http://127.0.0.1:${ADDON_PORT}/manifest.json`;
+}
+
+async function installAddonInStremio() {
+    if (!isAddonRunning()) {
+        return {
+            success: false,
+            error: addonServerStarting
+                ? 'The local add-on server is still starting. Try again in a moment.'
+                : `The local add-on server is not running${addonServerError ? `: ${addonServerError.message}` : '.'}`
+        };
+    }
+
+    const manifestUrl = getAddonManifestUrl();
+    clipboard.writeText(manifestUrl);
+
+    try {
+        await shell.openExternal('stremio:///board');
+    } catch (err) {
+        console.warn('Unable to open Stremio:', err);
+    }
+
+    return { success: true, manifestUrl };
 }
 
 // Addon server setup
 function startAddonServer() {
     try {
+        addonServerStarting = true;
+        addonServerError = null;
+
         const builder = new addonBuilder({
             id: "org.bryan.discordrpc",
             version: "1.0.0",
@@ -390,10 +416,27 @@ function startAddonServer() {
         });
 
         const addonInterface = builder.getInterface();
-        addonServer = serveHTTP(addonInterface, { port: 7000 });
-        console.log("Stremio Addon server running: http://localhost:7000/manifest.json");
+        serveHTTP(addonInterface, { port: ADDON_PORT })
+            .then(({ server }) => {
+                addonServer = server;
+                addonServerStarting = false;
+                addonServerError = null;
+                console.log(`Stremio Addon server running: ${getAddonManifestUrl()}`);
+                broadcastStatus();
+            })
+            .catch((err) => {
+                addonServer = null;
+                addonServerStarting = false;
+                addonServerError = err;
+                console.error('Stremio Addon server error:', err);
+                broadcastStatus();
+            });
     } catch (err) {
+        addonServer = null;
+        addonServerStarting = false;
+        addonServerError = err;
         console.error("Failed to start Stremio addon server:", err);
+        broadcastStatus();
     }
 }
 
@@ -470,7 +513,7 @@ function createTray() {
             } 
         },
         { 
-            label: 'Install Addon on Stremio', 
+            label: 'Copy Add-on URL & Open Stremio',
             click: () => {
                 installAddonInStremio();
             } 
@@ -578,14 +621,14 @@ ipcMain.handle('save-config', async (event, config) => {
 
 ipcMain.handle('get-status', () => {
     return {
-        addonRunning: !!addonServer,
-        addonPort: 7000,
+        addonRunning: isAddonRunning(),
+        addonPort: ADDON_PORT,
         discordConnected: isRpcConnected,
         discordStatusMessage: rpcStatusMessage,
         nowPlaying: currentNowPlaying
     };
 });
 
-ipcMain.on('install-addon', () => {
-    installAddonInStremio();
+ipcMain.handle('install-addon', () => {
+    return installAddonInStremio();
 });
