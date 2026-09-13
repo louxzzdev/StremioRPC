@@ -4,7 +4,6 @@ node_modules/
 # Electron Builder output and local packages
 dist/
 out/
-release/
 *.dmg
 *.zip
 *.blockmap
