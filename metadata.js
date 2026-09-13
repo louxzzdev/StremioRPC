@@ -1,6 +1,8 @@
 const titleCache = new Map();
+// Shared project key. OMDb keys are intended to be public when used by client apps.
+const OMDB_API_KEY = '413d7395';
 
-async function resolveMediaTitle(id, type = 'movie', config = {}) {
+async function resolveMediaTitle(id, type = 'movie') {
     if (!id) {
         return id;
     }
@@ -30,26 +32,23 @@ async function resolveMediaTitle(id, type = 'movie', config = {}) {
         console.warn('Stremio metadata lookup failed:', err);
     }
 
-    const omdbKey = config?.omdbApiKey?.trim();
-    if (omdbKey) {
-        try {
-            const response = await fetch(`https://www.omdbapi.com/?apikey=${encodeURIComponent(omdbKey)}&i=${encodeURIComponent(id)}`);
-            if (!response || !response.ok) {
-                if (response?.status === 401 || response?.status === 403) {
-                    console.warn('OMDb API key is invalid or unauthorized; using IMDb ID as fallback.');
-                } else {
-                    throw new Error(`OMDb request failed with status ${response?.status || 'unknown'}`);
-                }
+    try {
+        const response = await fetch(`https://www.omdbapi.com/?apikey=${encodeURIComponent(OMDB_API_KEY)}&i=${encodeURIComponent(id)}`);
+        if (!response || !response.ok) {
+            if (response?.status === 401 || response?.status === 403) {
+                console.warn('The shared OMDb API key is invalid or unauthorized; using IMDb ID as fallback.');
             } else {
-                const data = await response.json();
-                if (data?.Response === 'True' && data?.Title) {
-                    titleCache.set(cacheKey, data.Title);
-                    return data.Title;
-                }
+                throw new Error(`OMDb request failed with status ${response?.status || 'unknown'}`);
             }
-        } catch (err) {
-            console.warn('OMDb lookup failed:', err);
+        } else {
+            const data = await response.json();
+            if (data?.Response === 'True' && data?.Title) {
+                titleCache.set(cacheKey, data.Title);
+                return data.Title;
+            }
         }
+    } catch (err) {
+        console.warn('OMDb lookup failed:', err);
     }
 
     titleCache.set(cacheKey, id);

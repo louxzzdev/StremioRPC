@@ -7,6 +7,9 @@ const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
 const RPC = require('discord-rpc');
 const { resolveMediaTitle } = require('./metadata');
 
+// Public application ID registered for StremioRPC Rich Presence.
+const DISCORD_CLIENT_ID = '1548667063453622395';
+
 // App state
 let mainWindow = null;
 let tray = null;
@@ -14,10 +17,8 @@ let rpcClient = null;
 let isRpcConnected = false;
 let rpcStatusMessage = 'Disconnected';
 let currentNowPlaying = null;
-let lastConnectedClientId = '';
 let addonServer = null;
 let rpcRetryTimer = null;
-let rpcRetryClientId = '';
 
 // Playback monitoring state
 let playbackMonitorInterval = null;
@@ -44,8 +45,6 @@ function loadConfig() {
         console.error('Failed to load config:', e);
     }
     return {
-        discordClientId: '',
-        omdbApiKey: '',
         runOnBoot: false,
         minimizeToTray: true
     };
@@ -67,7 +66,8 @@ function setAutostart(enabled) {
         try {
             app.setLoginItemSettings({
                 openAtLogin: enabled,
-                path: process.execPath
+                path: process.execPath,
+                args: ['--hidden']
             });
         } catch (err) {
             console.error('Failed to set login item settings (Windows):', err);
@@ -150,8 +150,7 @@ function createApplicationMenu() {
 
 // Media title helper
 async function getTitleFromIMDB(id, type = 'movie') {
-    const config = loadConfig();
-    return resolveMediaTitle(id, type, config);
+    return resolveMediaTitle(id, type);
 }
 
 // Send updates to the UI
@@ -232,31 +231,21 @@ function stopPlaybackMonitor() {
 }
 
 // Discord RPC methods
-function scheduleRPCReconnect(clientId) {
-    if (!clientId) return;
-
-    rpcRetryClientId = clientId;
-
+function scheduleRPCReconnect() {
     if (rpcRetryTimer) {
         clearTimeout(rpcRetryTimer);
     }
 
     rpcRetryTimer = setTimeout(() => {
         rpcRetryTimer = null;
-        if (!isRpcConnected && rpcRetryClientId) {
-            connectRPC(rpcRetryClientId);
+        if (!isRpcConnected) {
+            connectRPC();
         }
     }, 5000);
 }
 
-async function connectRPC(clientId) {
+async function connectRPC() {
     await disconnectRPC();
-
-    if (!clientId) {
-        rpcStatusMessage = 'Client ID not set';
-        broadcastStatus();
-        return;
-    }
 
     if (rpcRetryTimer) {
         clearTimeout(rpcRetryTimer);
@@ -264,13 +253,12 @@ async function connectRPC(clientId) {
     }
 
     try {
-        RPC.register(clientId);
+        RPC.register(DISCORD_CLIENT_ID);
         rpcClient = new RPC.Client({ transport: 'ipc' });
 
         rpcClient.on('ready', () => {
             isRpcConnected = true;
             rpcStatusMessage = 'Connected';
-            rpcRetryClientId = '';
             console.log('Discord RPC connected successfully!');
             broadcastStatus();
         });
@@ -278,7 +266,7 @@ async function connectRPC(clientId) {
         rpcClient.on('disconnected', () => {
             isRpcConnected = false;
             rpcStatusMessage = 'Disconnected';
-            scheduleRPCReconnect(clientId);
+            scheduleRPCReconnect();
             console.log('Discord RPC disconnected');
             broadcastStatus();
         });
@@ -286,12 +274,12 @@ async function connectRPC(clientId) {
         rpcStatusMessage = 'Connecting...';
         broadcastStatus();
 
-        await rpcClient.login({ clientId });
+        await rpcClient.login({ clientId: DISCORD_CLIENT_ID });
     } catch (err) {
         console.error('Discord RPC login failed:', err);
         isRpcConnected = false;
         rpcStatusMessage = 'Connection failed';
-        scheduleRPCReconnect(clientId);
+        scheduleRPCReconnect();
         broadcastStatus();
     }
 }
@@ -312,7 +300,6 @@ async function disconnectRPC() {
         clearTimeout(rpcRetryTimer);
         rpcRetryTimer = null;
     }
-    rpcRetryClientId = '';
 }
 
 async function updateRPC(data) {
@@ -419,7 +406,7 @@ function createWindow() {
     }
     mainWindow = new BrowserWindow({
         width: 580,
-        height: 700,
+        height: 560,
         resizable: false,
         maximizable: false,
         title: 'StremioRPC Dashboard',
@@ -534,9 +521,8 @@ if (!gotTheLock) {
         // Establish autostart settings state
         setAutostart(config.runOnBoot);
 
-        // Connect to Discord RPC if Client ID exists
-        lastConnectedClientId = config.discordClientId;
-        connectRPC(config.discordClientId);
+        // Connect to the shared StremioRPC Discord application.
+        connectRPC();
 
         // Start addon server
         startAddonServer();
@@ -583,12 +569,6 @@ ipcMain.handle('save-config', async (event, config) => {
     const success = saveConfig(config);
     if (success) {
         setAutostart(config.runOnBoot);
-
-        if (config.discordClientId !== lastConnectedClientId) {
-            lastConnectedClientId = config.discordClientId;
-            // Async login to new client ID
-            connectRPC(config.discordClientId);
-        }
 
         broadcastStatus();
         return { success: true };

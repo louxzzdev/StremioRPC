@@ -202,50 +202,6 @@
             100% { transform: scale(0.95); opacity: 0.5; }
         }
 
-        /* Configuration Form */
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .form-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .form-input-container {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-
-        .form-input {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px;
-            padding: 14px 16px;
-            font-size: 14px;
-            color: var(--text-main);
-            outline: none;
-            transition: all 0.3s ease;
-            font-family: inherit;
-        }
-
-        .form-input:focus {
-            background: rgba(255, 255, 255, 0.07);
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 12px rgba(139, 92, 246, 0.25);
-        }
-
-        .form-input::placeholder {
-            color: rgba(255, 255, 255, 0.25);
-        }
-
         /* Toggle Options */
         .toggles-group {
             display: grid;
@@ -509,21 +465,6 @@
             <div class="now-playing-details">
                 <span class="now-playing-title" id="now-playing-title">Watching: Loading...</span>
                 <span class="now-playing-state" id="now-playing-state">Season 1 • Episode 1</span>
-            </div>
-        </div>
-
-        <!-- Form settings -->
-        <div class="form-group">
-            <label class="form-label" for="discord-client-id">Discord Client ID</label>
-            <div class="form-input-container">
-                <input class="form-input" type="text" id="discord-client-id" placeholder="Enter Discord Client ID (e.g. 119827364593817362)">
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label" for="omdb-api-key">OMDb API Key</label>
-            <div class="form-input-container">
-                <input class="form-input" type="text" id="omdb-api-key" placeholder="Enter OMDb API Key (for metadata lookup)">
             </div>
         </div>
 

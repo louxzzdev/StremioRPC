@@ -1,6 +1,4 @@
 // UI Elements
-const discordClientIdInput = document.getElementById('discord-client-id');
-const omdbApiKeyInput = document.getElementById('omdb-api-key');
 const runOnBootToggle = document.getElementById('run-on-boot');
 const minimizeToTrayToggle = document.getElementById('minimize-to-tray');
 const btnSave = document.getElementById('btn-save');
@@ -21,8 +19,6 @@ const toast = document.getElementById('toast');
 async function init() {
     try {
         const config = await window.api.getConfig();
-        discordClientIdInput.value = config.discordClientId || '';
-        omdbApiKeyInput.value = config.omdbApiKey || '';
         runOnBootToggle.checked = !!config.runOnBoot;
         minimizeToTrayToggle.checked = config.minimizeToTray !== false; // default true
 
@@ -81,8 +77,6 @@ function updateUIStatus(status) {
 // Event Listeners
 btnSave.addEventListener('click', async () => {
     const config = {
-        discordClientId: discordClientIdInput.value.trim(),
-        omdbApiKey: omdbApiKeyInput.value.trim(),
         runOnBoot: runOnBootToggle.checked,
         minimizeToTray: minimizeToTrayToggle.checked
     };
