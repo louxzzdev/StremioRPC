@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StremioRPC Dashboard</title>
+    <!-- Inter Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #09090b;
+            --card-bg: rgba(20, 20, 25, 0.65);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --accent-primary: #8b5cf6; /* Violet */
+            --accent-primary-glow: rgba(139, 92, 246, 0.5);
+            --accent-secondary: #001299; /* Blue */
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.3);
+            --error: #ef4444;
+            --error-glow: rgba(239, 68, 68, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Glowing background shapes */
+        .glow-sphere {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            z-index: 1;
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        .glow-1 {
+            width: 350px;
+            height: 350px;
+            background: radial-gradient(circle, var(--accent-primary) 0%, transparent 70%);
+            top: -50px;
+            left: -50px;
+            animation: float 12s infinite alternate ease-in-out;
+        }
+
+        .glow-2 {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, var(--accent-secondary) 0%, transparent 70%);
+            bottom: -50px;
+            right: -50px;
+            animation: float 15s infinite alternate-reverse ease-in-out;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(40px, 30px) scale(1.15); }
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 90%;
+            max-width: 580px;
+            height: auto;
+            max-height: 90vh;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 36px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 16px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .brand-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .brand-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #ffffff, #d4d4d8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .version {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 3px 8px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Status panel */
+        .status-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .status-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .status-value {
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.active {
+            background-color: var(--success);
+            box-shadow: 0 0 10px var(--success-glow);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.inactive {
+            background-color: var(--error);
+            box-shadow: 0 0 10px var(--error-glow);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.5; }
+        }
+
+        /* Configuration Form */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .form-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 14px;
+            color: var(--text-main);
+            outline: none;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.25);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Toggle Options */
+        .toggles-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .toggle-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .toggle-card:hover {
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .toggle-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .toggle-title {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .toggle-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.1);
+            transition: .3s;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent-primary);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Action Buttons */
+        .actions-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 8px;
+            
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: inherit;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+            color: white;
+            box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.09);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-secondary:active {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Toast notification */
+        .toast {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(9, 9, 11, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--accent-primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 15px var(--accent-primary-glow);
+            z-index: 100;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Now playing status */
+        .now-playing {
+            background: rgba(139, 92, 246, 0.05);
+            border: 1px solid rgba(139, 92, 246, 0.12);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .now-playing-cover {
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .now-playing-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .now-playing-details {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            overflow: hidden;
+        }
+
+        .now-playing-title {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .now-playing-state {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-sphere glow-1"></div>
+    <div class="glow-sphere glow-2"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="brand">
+                <div class="brand-logo">
+                    <img src="Assets/DiscordRPCStremio.png" alt="StremioRPC icon">
+                </div>
+                <div class="brand-title">StremioRPC</div>
+            </div>
+            <span class="version">v1.0.0</span>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="status-container">
+            <div class="status-card">
+                <span class="status-label">Addon Server</span>
+                <span class="status-value">
+                    <span id="addon-status-dot" class="status-dot inactive"></span>
+                    <span id="addon-status-text">Disconnected</span>
+                </span>
+            </div>
+            <div class="status-card">
+                <span class="status-label">Discord RPC</span>
+                <span class="status-value">
+                    <span id="discord-status-dot" class="status-dot inactive"></span>
+                    <span id="discord-status-text">Disconnected</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Now Playing (hidden by default) -->
+        <div id="now-playing-card" class="now-playing" style="display: none;">
+            <div class="now-playing-cover">
+                <img src="Assets/DiscordRPCStremio.png" alt="StremioRPC icon">
+            </div>
+            <div class="now-playing-details">
+                <span class="now-playing-title" id="now-playing-title">Watching: Loading...</span>
+                <span class="now-playing-state" id="now-playing-state">Season 1 • Episode 1</span>
+            </div>
+        </div>
+
+        <!-- Form settings -->
+        <div class="form-group">
+            <label class="form-label" for="discord-client-id">Discord Client ID</label>
+            <div class="form-input-container">
+                <input class="form-input" type="text" id="discord-client-id" placeholder="Enter Discord Client ID (e.g. 119827364593817362)">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="omdb-api-key">OMDb API Key</label>
+            <div class="form-input-container">
+                <input class="form-input" type="text" id="omdb-api-key" placeholder="Enter OMDb API Key (for metadata lookup)">
+            </div>
+        </div>
+
+        <!-- Toggles -->
+        <div class="toggles-group">
+            <label class="toggle-card" for="run-on-boot">
+                <div class="toggle-info">
+                    <span class="toggle-title">Run on Boot</span>
+                    <span class="toggle-desc">Autostart with OS</span>
+                </div>
+                <div class="switch">
+                    <input type="checkbox" id="run-on-boot">
+                    <span class="slider"></span>
+                </div>
+            </label>
+
+            <label class="toggle-card" for="minimize-to-tray">
+                <div class="toggle-info">
+                    <span class="toggle-title">Close to Tray</span>
+                    <span class="toggle-desc">Run in background</span>
+                </div>
+                <div class="switch">
+                    <input type="checkbox" id="minimize-to-tray" checked>
+                    <span class="slider"></span>
+                </div>
+            </label>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions-group">
+            <button id="btn-save" class="btn btn-primary">Save Settings</button>
+            <button id="btn-install" class="btn btn-secondary">Install Addon on Stremio</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">Settings Saved!</div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
