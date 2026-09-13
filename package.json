@@ -1,6 +1,6 @@
 {
   "name": "stremio-rpc",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Sends Stremio watching information to Discord Rich Presence.",
   "main": "index.js",
   "scripts": {
@@ -15,7 +15,7 @@
     "dist:mac:arm64": "electron-builder --mac --arm64 --publish never",
     "dist:mac:x64": "electron-builder --mac --x64 --publish never",
     "setup": "npm install",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node scripts/verify.js"
   },
   "dependencies": {
     "discord-rpc": "^4.0.1",

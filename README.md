@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License" />
 </p>
 
-StremioRPC is a desktop companion that runs a small local Stremio add-on and sends playback information to Discord Rich Presence. Start a movie or an episode and Discord will show the title, season, episode, and elapsed time.
+StremioRPC is a desktop companion that runs a small local Stremio add-on and sends playback information to Discord Rich Presence. Start a movie or an episode and Discord will show the title, season, episode, poster, and total runtime.
 
 There are no API keys or Discord IDs for users to configure. The application uses the shared StremioRPC Discord application and OMDb fallback key out of the box.
 
@@ -24,7 +24,7 @@ There are no API keys or Discord IDs for users to configure. The application use
 - Displays Stremio movies and series in Discord Rich Presence.
 - Resolves titles, posters, and runtimes through Cinemeta, with the project OMDb key as a fallback.
 - Shows the movie or episode poster and total runtime in Discord Rich Presence.
-- Installs the local Stremio add-on from the app.
+- Copies the ready-to-install local Stremio add-on URL from the app.
 - Runs quietly in the system tray or macOS menu bar.
 - Starts at login when enabled.
 - Clears stale Discord activity when Stremio is no longer available.
@@ -41,13 +41,15 @@ On Linux, use a Discord package that supports local IPC. The Flatpak build may n
 
 1. Download and install the release for your operating system.
 2. Open StremioRPC. It connects to Discord automatically.
-3. Click **Copy Add-on URL & Open Stremio**. The local URL is copied to your clipboard.
+3. Click **Copy Add-on URL**.
 4. In Stremio, open **Add-ons**, paste the URL into **Add-on Repository URL**, and install it once.
 5. Start watching in Stremio.
 
 That is all the setup required. You can enable **Run on Boot** and **Close to Tray** in the app so the companion stays available without being opened manually.
 
 The add-on is local-only and is served at `http://127.0.0.1:45123`; no playback information is sent to a StremioRPC server.
+
+The Stremio add-on protocol does not provide live player position, pause state, or seeking events. For that reason, StremioRPC deliberately shows the total runtime only and does not display an inaccurate elapsed or remaining timer.
 
 ## Platform packages
 
@@ -94,9 +96,10 @@ Settings are saved in the system application-data directory as `config.json`. Th
 Use a current Node.js LTS release and npm.
 
 ```bash
-git clone https://github.com/bryanrafaelbueno/StremioRPC.git
+git clone https://github.com/louxzzdev/StremioRPC.git
 cd StremioRPC
 npm ci
+npm test
 npm start
 ```
 
@@ -135,10 +138,10 @@ Before the first release, open **GitHub repository Settings > Actions > General 
 
 ```bash
 git add .
-git commit -m "Release v1.0.1"
+git commit -m "Release v1.0.3"
 git push origin main
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.3
+git push origin v1.0.3
 ```
 
 Open the **Actions** tab to follow the build. When it succeeds, the new GitHub Release and its downloads appear under **Releases**. Use **Run workflow** from the same Actions page for a build-only test; it does not publish a release.
@@ -171,7 +174,7 @@ Open the Discord Desktop app, then restart StremioRPC. Confirm that activity sha
 
 **Playback does not appear**
 
-Use **Copy Add-on URL & Open Stremio** from StremioRPC, then paste the copied URL into Stremio's **Add-on Repository URL** field. Check that the dashboard reports the add-on as running on port 45123.
+Check that the dashboard reports the add-on as running on port 45123. Then use **Copy Add-on URL** and paste the copied URL into Stremio's **Add-on Repository URL** field. This local setup is only required once.
 
 **An IMDb ID appears instead of a title**
 

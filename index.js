@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, clipboard, ipcMain, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, clipboard, ipcMain, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -305,17 +305,12 @@ async function updateRPC(data) {
     const activity = {
         details: `Watching: ${title}`,
         largeImageKey: media.poster || 'stremio',
-        largeImageText: title,
-        startTimestamp: Math.floor(data.timestamp / 1000)
+        largeImageText: title
     };
 
     if (media.poster) {
         activity.smallImageKey = 'stremio';
         activity.smallImageText = 'StremioRPC';
-    }
-
-    if (media.runtimeSeconds) {
-        activity.endTimestamp = Math.floor((data.timestamp + media.runtimeSeconds * 1000) / 1000);
     }
 
     if (season && episode) {
@@ -364,13 +359,6 @@ async function installAddonInStremio() {
 
     const manifestUrl = getAddonManifestUrl();
     clipboard.writeText(manifestUrl);
-
-    try {
-        await shell.openExternal('stremio:///board');
-    } catch (err) {
-        console.warn('Unable to open Stremio:', err);
-    }
-
     return { success: true, manifestUrl };
 }
 
@@ -394,8 +382,7 @@ function startAddonServer() {
         builder.defineStreamHandler(async (args) => {
             const info = {
                 id: args.id,
-                type: args.type,
-                timestamp: Date.now()
+                type: args.type
             };
             
             // Trigger update in RPC
@@ -407,8 +394,7 @@ function startAddonServer() {
         builder.defineSubtitlesHandler(async (args) => {
             const info = {
                 id: args.id,
-                type: args.type,
-                timestamp: Date.now()
+                type: args.type
             };
 
             updateRPC(info);
@@ -448,8 +434,8 @@ function createWindow() {
         return;
     }
     mainWindow = new BrowserWindow({
-        width: 580,
-        height: 560,
+        width: 640,
+        height: 700,
         resizable: false,
         maximizable: false,
         title: 'StremioRPC Dashboard',
@@ -513,7 +499,7 @@ function createTray() {
             } 
         },
         { 
-            label: 'Copy Add-on URL & Open Stremio',
+            label: 'Copy Add-on URL',
             click: () => {
                 installAddonInStremio();
             } 

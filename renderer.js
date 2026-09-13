@@ -77,6 +77,10 @@ function updateUIStatus(status) {
         nowPlayingCard.style.display = 'flex';
         nowPlayingTitle.textContent = `Watching: ${status.nowPlaying.title}`;
         nowPlayingCover.src = status.nowPlaying.poster || 'Assets/DiscordRPCStremio.png';
+        nowPlayingCover.onerror = () => {
+            nowPlayingCover.onerror = null;
+            nowPlayingCover.src = 'Assets/DiscordRPCStremio.png';
+        };
 
         const state = [];
         if (status.nowPlaying.season && status.nowPlaying.episode) {
@@ -117,7 +121,7 @@ btnInstall.addEventListener('click', async () => {
     try {
         const result = await window.api.installAddon();
         if (result.success) {
-            showToast('Add-on URL copied. Paste it into Stremio’s Add-on Repository URL field.');
+            showToast('Add-on URL copied. Paste it into Stremio to install.');
         } else {
             showToast(result.error || 'Unable to prepare the add-on URL.');
         }
